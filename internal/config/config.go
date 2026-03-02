@@ -143,14 +143,14 @@ func allPanesSimple(panes []Pane) bool {
 }
 
 func Dir() string {
-	if dir := os.Getenv("MUXIFY_CONFIG"); dir != "" {
+	if dir := os.Getenv("FROSTMUX_CONFIG"); dir != "" {
 		return dir
 	}
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
-		return filepath.Join(dir, "muxify")
+		return filepath.Join(dir, "frostmux")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "muxify")
+	return filepath.Join(home, ".config", "frostmux")
 }
 
 func FindConfig(name string) (string, error) {

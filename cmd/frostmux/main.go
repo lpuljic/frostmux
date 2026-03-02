@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/lpuljic/muxify/internal/config"
-	"github.com/lpuljic/muxify/internal/session"
-	"github.com/lpuljic/muxify/internal/tmux"
+	"github.com/lpuljic/frostmux/internal/config"
+	"github.com/lpuljic/frostmux/internal/session"
+	"github.com/lpuljic/frostmux/internal/tmux"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,14 +48,14 @@ func main() {
 		usage()
 		return
 	case "version", "-v", "--version":
-		fmt.Printf("muxify %s\n", version)
+		fmt.Printf("frostmux %s\n", version)
 		return
 	default:
 		err = cmdStart([]string{cmd})
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "muxify: %v\n", err)
+		fmt.Fprintf(os.Stderr, "frostmux: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -90,7 +90,7 @@ func cmdStart(args []string) error {
 
 func cmdStop(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: muxify stop <project>")
+		return fmt.Errorf("usage: frostmux stop <project>")
 	}
 
 	mgr := session.NewManager(tmux.NewClient())
@@ -178,7 +178,7 @@ func cmdInit(args []string) error {
 
 	path := filepath.Join(cfgDir, cfg.Session+".yml")
 	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("config %q already exists, use 'muxify edit %s' to modify", path, cfg.Session)
+		return fmt.Errorf("config %q already exists, use 'frostmux edit %s' to modify", path, cfg.Session)
 	}
 
 	if err := os.WriteFile(path, data, 0o644); err != nil {
@@ -191,7 +191,7 @@ func cmdInit(args []string) error {
 
 func cmdNew(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: muxify new <project>")
+		return fmt.Errorf("usage: frostmux new <project>")
 	}
 
 	name := args[0]
@@ -229,7 +229,7 @@ func cmdNew(args []string) error {
 
 func cmdEdit(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: muxify edit <project>")
+		return fmt.Errorf("usage: frostmux edit <project>")
 	}
 
 	path, err := config.FindConfig(args[0])
@@ -242,7 +242,7 @@ func cmdEdit(args []string) error {
 
 func cmdDelete(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: muxify delete <project>")
+		return fmt.Errorf("usage: frostmux delete <project>")
 	}
 
 	path, err := config.FindConfig(args[0])
@@ -260,7 +260,7 @@ func cmdDelete(args []string) error {
 
 func cmdCompletion(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: muxify completion <bash|zsh|fish>")
+		return fmt.Errorf("usage: frostmux completion <bash|zsh|fish>")
 	}
 
 	switch args[0] {
@@ -276,7 +276,7 @@ func cmdCompletion(args []string) error {
 	return nil
 }
 
-const bashCompletion = `_muxify() {
+const bashCompletion = `_frostmux() {
     local cur prev commands
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
@@ -284,11 +284,11 @@ const bashCompletion = `_muxify() {
 
     case "$prev" in
         start|s|stop|st|edit|e|delete|rm)
-            COMPREPLY=($(compgen -W "$(muxify list 2>/dev/null)" -- "$cur"))
+            COMPREPLY=($(compgen -W "$(frostmux list 2>/dev/null)" -- "$cur"))
             return
             ;;
-        muxify)
-            COMPREPLY=($(compgen -W "$commands $(muxify list 2>/dev/null)" -- "$cur"))
+        frostmux)
+            COMPREPLY=($(compgen -W "$commands $(frostmux list 2>/dev/null)" -- "$cur"))
             return
             ;;
         completion)
@@ -297,10 +297,10 @@ const bashCompletion = `_muxify() {
             ;;
     esac
 }
-complete -F _muxify muxify
+complete -F _frostmux frostmux
 `
 
-const zshCompletion = `_muxify() {
+const zshCompletion = `_frostmux() {
     local -a commands projects
     commands=(
         'start:Start a session from config'
@@ -326,14 +326,14 @@ const zshCompletion = `_muxify() {
 
     case "$state" in
         cmd)
-            projects=(${(f)"$(muxify list 2>/dev/null)"})
+            projects=(${(f)"$(frostmux list 2>/dev/null)"})
             _describe 'command' commands
             [[ ${#projects} -gt 0 ]] && _describe 'project' projects
             ;;
         args)
             case "$words[2]" in
                 start|s|stop|st|edit|e|delete|rm)
-                    projects=(${(f)"$(muxify list 2>/dev/null)"})
+                    projects=(${(f)"$(frostmux list 2>/dev/null)"})
                     [[ ${#projects} -gt 0 ]] && _describe 'project' projects
                     ;;
                 completion)
@@ -344,14 +344,14 @@ const zshCompletion = `_muxify() {
     esac
 }
 
-compdef _muxify muxify
+compdef _frostmux frostmux
 `
 
-const fishCompletion = `complete -c muxify -f
-complete -c muxify -n '__fish_use_subcommand' -a 'start stop list freeze init new edit delete completion help version'
-complete -c muxify -n '__fish_use_subcommand' -a '(muxify list 2>/dev/null)'
-complete -c muxify -n '__fish_seen_subcommand_from start s stop st edit e delete rm' -a '(muxify list 2>/dev/null)'
-complete -c muxify -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
+const fishCompletion = `complete -c frostmux -f
+complete -c frostmux -n '__fish_use_subcommand' -a 'start stop list freeze init new edit delete completion help version'
+complete -c frostmux -n '__fish_use_subcommand' -a '(frostmux list 2>/dev/null)'
+complete -c frostmux -n '__fish_seen_subcommand_from start s stop st edit e delete rm' -a '(frostmux list 2>/dev/null)'
+complete -c frostmux -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
 `
 
 func openEditor(path string) error {
@@ -368,12 +368,12 @@ func openEditor(path string) error {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `muxify — tmux session manager
+	fmt.Fprintf(os.Stderr, `frostmux — tmux session manager
 
 Capture first, config second.
 
 Usage:
-  muxify <command> [arguments]
+  frostmux <command> [arguments]
 
 Commands:
   start, s   <project> [-f file]  Start a session from config
@@ -389,8 +389,8 @@ Commands:
   help                            Show this help
 
 Shortcut:
-  muxify <project>                Same as 'muxify start <project>'
+  frostmux <project>                Same as 'frostmux start <project>'
 
-Config files: ~/.config/muxify/ (override with $MUXIFY_CONFIG)
+Config files: ~/.config/frostmux/ (override with $frostmux_CONFIG)
 `)
 }

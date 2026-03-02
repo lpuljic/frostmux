@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lpuljic/muxify/internal/config"
-	"github.com/lpuljic/muxify/internal/tmux"
+	"github.com/lpuljic/frostmux/internal/config"
+	"github.com/lpuljic/frostmux/internal/tmux"
 )
 
 type Manager struct {

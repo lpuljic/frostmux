@@ -1,4 +1,4 @@
-module github.com/lpuljic/muxify
+module github.com/lpuljic/frostmux
 
 go 1.25.6
 

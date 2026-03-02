@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="logo.png" alt="muxify" width="200">
+  <img src="logo.png" alt="frostmux" width="200">
 </p>
 
-<h1 align="center">muxify</h1>
+<h1 align="center">frostmux</h1>
 
 <p align="center">A tmux session manager that writes your config for you.</p>
 
@@ -16,19 +16,19 @@
 ## Install
 
 ```bash
-go install github.com/lpuljic/muxify/cmd/muxify@latest
+go install github.com/lpuljic/frostmux/cmd/frostmux@latest
 ```
 
 ## Quick Start
 
 ```bash
 # 1. Set up tmux however you want, then capture it
-muxify freeze my-project
+frostmux freeze my-project
 
 # 2. Next time, replay it
-muxify start my-project
+frostmux start my-project
 # or just
-muxify my-project
+frostmux my-project
 ```
 
 ## Usage
@@ -38,25 +38,25 @@ muxify my-project
 Captures your current tmux session (windows, panes, working directories, layout) and saves it as a YAML config.
 
 ```bash
-muxify freeze my-project    # saves to ~/.config/muxify/my-project.yml
-muxify freeze               # prints config to stdout
+frostmux freeze my-project    # saves to ~/.config/frostmux/my-project.yml
+frostmux freeze               # prints config to stdout
 ```
 
 ### Start a session
 
 ```bash
-muxify start my-project
-muxify my-project            # shortcut
-muxify start -f ./custom.yml # start from a specific file
+frostmux start my-project
+frostmux my-project            # shortcut
+frostmux start -f ./custom.yml # start from a specific file
 ```
 
-If the session already exists, muxify attaches to it instead of creating a duplicate.
+If the session already exists, frostmux attaches to it instead of creating a duplicate.
 
 ### Scaffold from project detection
 
 ```bash
 cd ~/code/my-go-project
-muxify init
+frostmux init
 ```
 
 Detects your project type and generates a sensible config:
@@ -72,16 +72,16 @@ Detects your project type and generates a sensible config:
 ### Other commands
 
 ```bash
-muxify list              # list saved configs
-muxify stop <project>    # kill a session
-muxify new <project>     # create a blank config and open in $EDITOR
-muxify edit <project>    # edit an existing config
-muxify delete <project>  # delete a config
+frostmux list              # list saved configs
+frostmux stop <project>    # kill a session
+frostmux new <project>     # create a blank config and open in $EDITOR
+frostmux edit <project>    # edit an existing config
+frostmux delete <project>  # delete a config
 ```
 
 ## Config Format
 
-Configs live in `~/.config/muxify/` (override with `$MUXIFY_CONFIG` or `$XDG_CONFIG_HOME`).
+Configs live in `~/.config/frostmux/` (override with `$frostmux_CONFIG` or `$XDG_CONFIG_HOME`).
 
 ### Shorthand: single command per window
 
@@ -138,13 +138,13 @@ windows:
 
 ```bash
 # zsh (~/.zshrc)
-eval "$(muxify completion zsh)"
+eval "$(frostmux completion zsh)"
 
 # bash (~/.bashrc)
-eval "$(muxify completion bash)"
+eval "$(frostmux completion bash)"
 
 # fish (~/.config/fish/config.fish)
-muxify completion fish | source
+frostmux completion fish | source
 ```
 
 ## Layouts
