@@ -2,11 +2,12 @@
   <img src="logo.png" alt="frostmux" width="200">
 </p>
 
-<h1 align="center">frostmux</h1>
 
 <p align="center">A tmux session manager that writes your config for you.</p>
 
-**Capture first, config second.** Arrange your tmux windows and panes the way you like them, freeze the layout to YAML, and replay it whenever you need it. No hand-written configs required.
+**Capture first, config second.** 
+
+Arrange your tmux windows and panes the way you like them, freeze the layout to YAML, and replay it whenever you need it. No hand-written configs required.
 
 ## Requirements
 
