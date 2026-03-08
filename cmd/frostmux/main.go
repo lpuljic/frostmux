@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// set by -ldflags at build time
 var version = "dev"
 
 func main() {
@@ -24,6 +25,8 @@ func main() {
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
+	// bare `frostmux myproject` falls through to default and just starts it,
+	// so you don't have to type `frostmux start myproject` every time
 	var err error
 	switch cmd {
 	case "start", "s":
@@ -114,6 +117,8 @@ func cmdList() error {
 	return nil
 }
 
+// cmdFreeze snapshots a live tmux session into YAML.
+// With a name it saves to disk, without it dumps to stdout so you can pipe it.
 func cmdFreeze(args []string) error {
 	var name string
 	if len(args) > 0 {
@@ -153,6 +158,8 @@ func cmdFreeze(args []string) error {
 	return nil
 }
 
+// cmdInit looks at the project dir (go.mod, package.json, etc.) and
+// generates a reasonable starting config. Opens $EDITOR so you can tweak it.
 func cmdInit(args []string) error {
 	dir := "."
 	if len(args) > 0 {
@@ -357,7 +364,7 @@ complete -c frostmux -n '__fish_seen_subcommand_from completion' -a 'bash zsh fi
 func openEditor(path string) error {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
-		editor = "vi"
+		editor = "vi" // sorry nano fans
 	}
 
 	cmd := exec.Command(editor, path)

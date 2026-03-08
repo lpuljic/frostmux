@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 )
 
+// Detect sniffs the project directory for known build files and returns
+// a config with sensible window presets. Not perfect, but beats starting
+// from scratch every time.
 func Detect(dir string) *Config {
 	dir = ExpandPath(dir)
 	if dir == "" || dir == "." {

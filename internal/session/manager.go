@@ -23,6 +23,7 @@ func (m *Manager) Start(cfg *config.Config) error {
 		return fmt.Errorf("config has no windows defined")
 	}
 
+	// already running? just jump to it
 	if m.tmux.HasSession(cfg.Session) {
 		return m.attach(cfg.Session)
 	}
@@ -30,12 +31,15 @@ func (m *Manager) Start(cfg *config.Config) error {
 	for i, win := range cfg.Windows {
 		winRoot := win.Root
 
+		// tmux new-session / new-window needs a starting dir for the first pane,
+		// the rest get their dirs when we split
 		firstPaneRoot := winRoot
 		if len(win.Panes) > 0 && win.Panes[0].Root != "" {
 			firstPaneRoot = config.ResolveRoot(winRoot, win.Panes[0].Root)
 		}
 
 		if i == 0 {
+			// first window is created implicitly with the session
 			if err := m.tmux.NewSession(cfg.Session, firstPaneRoot); err != nil {
 				return fmt.Errorf("creating session %q: %w", cfg.Session, err)
 			}
@@ -50,6 +54,7 @@ func (m *Manager) Start(cfg *config.Config) error {
 
 		winTarget := cfg.Session + ":" + win.Name
 
+		// pane 0 already exists from the window creation, start splitting from 1
 		for j := 1; j < len(win.Panes); j++ {
 			paneRoot := config.ResolveRoot(winRoot, win.Panes[j].Root)
 			if err := m.tmux.SplitWindow(winTarget, paneRoot); err != nil {
@@ -61,6 +66,8 @@ func (m *Manager) Start(cfg *config.Config) error {
 			m.tmux.SelectLayout(winTarget, win.Layout)
 		}
 
+		// fire off startup commands (send-keys, not shell -c, so the
+		// command shows up in the pane's scrollback naturally)
 		for j, pane := range win.Panes {
 			if pane.Command != "" {
 				paneTarget := fmt.Sprintf("%s.%d", winTarget, j)
@@ -69,6 +76,7 @@ func (m *Manager) Start(cfg *config.Config) error {
 		}
 	}
 
+	// land the user on the first window, first pane
 	firstWin := cfg.Session + ":" + cfg.Windows[0].Name
 	m.tmux.SelectWindow(firstWin)
 	m.tmux.SelectPane(firstWin + ".0")
@@ -139,6 +147,8 @@ func (m *Manager) Freeze(saveName string) (*config.Config, error) {
 	return cfg, nil
 }
 
+// attach or switch depending on whether we're already inside tmux.
+// switch-client works from within tmux, attach-session from outside.
 func (m *Manager) attach(name string) error {
 	if tmux.InsideTmux() {
 		return m.tmux.SwitchClient(name)
@@ -171,10 +181,10 @@ func ListConfigs() ([]string, error) {
 			continue
 		}
 		name := e.Name()
-		if strings.HasSuffix(name, ".yml") {
-			configs = append(configs, strings.TrimSuffix(name, ".yml"))
-		} else if strings.HasSuffix(name, ".yaml") {
-			configs = append(configs, strings.TrimSuffix(name, ".yaml"))
+		if before, ok := strings.CutSuffix(name, ".yml"); ok {
+			configs = append(configs, before)
+		} else if before, ok := strings.CutSuffix(name, ".yaml"); ok {
+			configs = append(configs, before)
 		}
 	}
 	return configs, nil

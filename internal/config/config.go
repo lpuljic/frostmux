@@ -26,6 +26,8 @@ type Pane struct {
 	Root    string `yaml:"root,omitempty"`
 }
 
+// windowFull is the verbose YAML form with root/layout/panes.
+// Only used for (un)marshaling, not passed around elsewhere.
 type windowFull struct {
 	Root   string `yaml:"root,omitempty"`
 	Layout string `yaml:"layout,omitempty"`
@@ -60,11 +62,22 @@ func Parse(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// UnmarshalYAML handles the three config flavors:
+//
+//   - editor: nvim           # scalar (single pane)
+//   - logs:                   # sequence (multiple panes)
+//   - tail -f app.log
+//   - tail -f error.log
+//   - code:                   # mapping (full control)
+//     root: ~/src
+//     layout: main-vertical
+//     panes: [...]
 func (w *Window) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode || len(node.Content) < 2 {
 		return fmt.Errorf("window must be a mapping with a name key")
 	}
 
+	// the window name is always the first key in the mapping
 	w.Name = node.Content[0].Value
 	val := node.Content[1]
 
@@ -103,7 +116,10 @@ func (w *Window) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-func (w Window) MarshalYAML() (interface{}, error) {
+// MarshalYAML picks the most compact YAML representation that still
+// roundtrips correctly. Single pane with no root? Scalar. Multiple simple
+// panes? Sequence. Anything else gets the full mapping form.
+func (w Window) MarshalYAML() (any, error) {
 	home, _ := os.UserHomeDir()
 	isHome := w.Root == "" || w.Root == home || w.Root == "~"
 
@@ -142,6 +158,8 @@ func allPanesSimple(panes []Pane) bool {
 	return true
 }
 
+// Dir returns the config directory, respecting FROSTMUX_CONFIG and
+// XDG_CONFIG_HOME before falling back to ~/.config/frostmux.
 func Dir() string {
 	if dir := os.Getenv("FROSTMUX_CONFIG"); dir != "" {
 		return dir
@@ -153,6 +171,8 @@ func Dir() string {
 	return filepath.Join(home, ".config", "frostmux")
 }
 
+// FindConfig tries .yml first, then .yaml, because life's too short
+// to argue about file extensions.
 func FindConfig(name string) (string, error) {
 	if name == "" {
 		return "", fmt.Errorf("no project specified")
@@ -194,8 +214,8 @@ func CompactPath(path string) string {
 	if path == home {
 		return "~"
 	}
-	if strings.HasPrefix(path, home+"/") {
-		return "~/" + strings.TrimPrefix(path, home+"/")
+	if after, ok := strings.CutPrefix(path, home+"/"); ok {
+		return "~/" + after
 	}
 	return path
 }

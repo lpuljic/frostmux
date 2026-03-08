@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// Client wraps the tmux binary. All the methods here are thin wrappers
+// around `tmux <subcommand>`, nothing fancy.
 type Client struct {
 	bin string
 }
@@ -65,6 +67,8 @@ func (c *Client) SelectPane(target string) error {
 	return err
 }
 
+// Attach needs to take over the terminal, so we can't use exec() here,
+// we need the real stdin/stdout/stderr
 func (c *Client) Attach(name string) error {
 	cmd := exec.Command(c.bin, "attach-session", "-t", name)
 	cmd.Stdin = os.Stdin
@@ -119,6 +123,8 @@ type PaneInfo struct {
 	CurrentCommand string
 }
 
+// ListWindows parses the tab-delimited output from tmux list-windows.
+// The format string is fragile but tmux has kept it stable since forever.
 func (c *Client) ListWindows(session string) ([]WindowInfo, error) {
 	out, err := c.exec("list-windows", "-t", session, "-F", "#{window_index}\t#{window_name}\t#{window_layout}")
 	if err != nil {
@@ -126,7 +132,7 @@ func (c *Client) ListWindows(session string) ([]WindowInfo, error) {
 	}
 
 	var windows []WindowInfo
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		parts := strings.SplitN(line, "\t", 3)
 		if len(parts) != 3 {
 			continue
@@ -147,7 +153,7 @@ func (c *Client) ListPanes(target string) ([]PaneInfo, error) {
 	}
 
 	var panes []PaneInfo
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		parts := strings.SplitN(line, "\t", 3)
 		if len(parts) != 3 {
 			continue
