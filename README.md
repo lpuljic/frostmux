@@ -2,17 +2,16 @@
   <img src="logo.png" alt="frostmux" width="200">
 </p>
 
-
 <p align="center">A tmux session manager that writes your config for you.</p>
 
-**Capture first, config second.** 
+**Capture first, config second.**
 
 Arrange your tmux windows and panes the way you like them, freeze the layout to YAML, and replay it whenever you need it. No hand-written configs required.
 
 ## Requirements
 
 - [tmux](https://github.com/tmux/tmux)
-- [Go 1.21+](https://go.dev/dl/) (for installation)
+- [Go 1.25+](https://go.dev/dl/) (for installation)
 
 ## Install
 
@@ -23,66 +22,64 @@ go install github.com/lpuljic/frostmux/cmd/frostmux@latest
 ## Quick Start
 
 ```bash
-# 1. Set up tmux however you want, then capture it
-frostmux freeze my-project
+# 1. Create a new tmux session
+frostmux new my-project
 
-# 2. Next time, replay it
-frostmux start my-project
-# or just
+# 2. Set up your windows, panes, working directories however you want
+#    ... do your thing ...
+
+# 3. Freeze it
+frostmux freeze
+
+# 4. Next time, just start it
 frostmux my-project
 ```
 
-## Usage
+That's the whole workflow. Set up once, replay forever.
 
-### Freeze a running session
+## Commands
 
-Captures your current tmux session (windows, panes, working directories, layout) and saves it as a YAML config.
-
-```bash
-frostmux freeze my-project    # saves to ~/.config/frostmux/my-project.yml
-frostmux freeze               # prints config to stdout
+```
+frostmux <project>              Start or attach to a session
+frostmux new <project>          Create a new tmux session
+frostmux freeze                 Capture current session to YAML
+frostmux stop <project>         Kill a tmux session
+frostmux list                   List available configs
+frostmux edit <project>         Edit an existing config
+frostmux delete <project>       Delete a config
 ```
 
-### Start a session
+### `frostmux new <project>`
+
+Creates a fresh tmux session and attaches to it. If a session with that name already exists, it just attaches.
 
 ```bash
-frostmux start my-project
-frostmux my-project            # shortcut
-frostmux start -f ./custom.yml # start from a specific file
+frostmux new api
 ```
 
-If the session already exists, frostmux attaches to it instead of creating a duplicate.
+### `frostmux freeze`
 
-### Scaffold from project detection
+Captures your current tmux session (windows, panes, working directories, layout) and saves it as YAML. Must be run from inside tmux.
 
 ```bash
-cd ~/code/my-go-project
-frostmux init
+frostmux freeze    # saves to ~/.config/frostmux/<session-name>.yml
 ```
 
-Detects your project type and generates a sensible config:
+The config file name comes from your tmux session name. Running freeze again overwrites the previous config with the current state.
 
-| Detected file    | Windows generated          |
-|------------------|----------------------------|
-| `go.mod`         | editor, build, test        |
-| `package.json`   | editor, dev, test          |
-| `Cargo.toml`     | editor, build, test        |
-| `Makefile`       | editor, build, shell       |
-| (none)           | editor, shell              |
+### `frostmux <project>`
 
-### Other commands
+Starts a session from a saved config. If the session is already running, it attaches instead of creating a duplicate.
 
 ```bash
-frostmux list              # list saved configs
-frostmux stop <project>    # kill a session
-frostmux new <project>     # create a blank config and open in $EDITOR
-frostmux edit <project>    # edit an existing config
-frostmux delete <project>  # delete a config
+frostmux my-project
 ```
 
 ## Config Format
 
-Configs live in `~/.config/frostmux/` (override with `$frostmux_CONFIG` or `$XDG_CONFIG_HOME`).
+Configs live in `~/.config/frostmux/` (override with `$FROSTMUX_CONFIG` or `$XDG_CONFIG_HOME`).
+
+You'll rarely write these by hand since `freeze` generates them, but here's what they look like:
 
 ### Shorthand: single command per window
 
@@ -117,7 +114,7 @@ windows:
           root: ~/code/api/tests
 ```
 
-### Focus: choose where you land
+### Focus
 
 By default frostmux selects the first window, first pane. Use `focus` to land somewhere else:
 
@@ -133,31 +130,13 @@ windows:
         - command: go test ./...
 ```
 
-You can target a specific pane with `window.pane`:
+Target a specific pane with `window.pane`:
 
 ```yaml
 focus: dev.1     # land on the "dev" window, second pane
 ```
 
 When you `freeze` a session, frostmux captures whichever window and pane you're currently looking at.
-
-### Mixed: all three in one config
-
-```yaml
-session: my-project
-windows:
-  - editor: nvim
-  - notes:
-      root: ~/Documents/notes
-      panes:
-        - command: ""
-  - dev:
-      root: ~/code/my-project
-      layout: tiled
-      panes:
-        - command: go run .
-        - command: go test ./...
-```
 
 ## Shell Completion
 

@@ -44,7 +44,9 @@ func (m *Manager) Start(cfg *config.Config) error {
 				return fmt.Errorf("creating session %q: %w", cfg.Session, err)
 			}
 			if win.Name != "" {
-				m.tmux.RenameWindow(cfg.Session, win.Name)
+				if err := m.tmux.RenameWindow(cfg.Session, win.Name); err != nil {
+					return fmt.Errorf("renaming window in %q: %w", cfg.Session, err)
+				}
 			}
 		} else {
 			if err := m.tmux.NewWindow(cfg.Session, win.Name, firstPaneRoot); err != nil {
@@ -63,7 +65,9 @@ func (m *Manager) Start(cfg *config.Config) error {
 		}
 
 		if win.Layout != "" {
-			m.tmux.SelectLayout(winTarget, win.Layout)
+			if err := m.tmux.SelectLayout(winTarget, win.Layout); err != nil {
+				return fmt.Errorf("setting layout for window %q: %w", win.Name, err)
+			}
 		}
 
 		// fire off startup commands (send-keys, not shell -c, so the
@@ -71,15 +75,21 @@ func (m *Manager) Start(cfg *config.Config) error {
 		for j, pane := range win.Panes {
 			if pane.Command != "" {
 				paneTarget := fmt.Sprintf("%s.%d", winTarget, j)
-				m.tmux.SendKeys(paneTarget, expandEditor(pane.Command))
+				if err := m.tmux.SendKeys(paneTarget, expandEditor(pane.Command)); err != nil {
+					return fmt.Errorf("sending command to %s: %w", paneTarget, err)
+				}
 			}
 		}
 	}
 
 	focusWin, focusPane := parseFocus(cfg.Focus, cfg.Windows[0].Name)
 	target := cfg.Session + ":" + focusWin
-	m.tmux.SelectWindow(target)
-	m.tmux.SelectPane(fmt.Sprintf("%s.%d", target, focusPane))
+	if err := m.tmux.SelectWindow(target); err != nil {
+		return fmt.Errorf("selecting window %q: %w", focusWin, err)
+	}
+	if err := m.tmux.SelectPane(fmt.Sprintf("%s.%d", target, focusPane)); err != nil {
+		return fmt.Errorf("selecting pane %d in %q: %w", focusPane, focusWin, err)
+	}
 
 	return m.Attach(cfg.Session)
 }
