@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,20 +24,16 @@ func main() {
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
-	// bare `frostmux myproject` falls through to default and just starts it,
-	// so you don't have to type `frostmux start myproject` every time
+	// `frostmux myproject` is the only way to start a session,
+	// no redundant "start" subcommand needed
 	var err error
 	switch cmd {
-	case "start", "s":
-		err = cmdStart(args)
 	case "stop", "st":
 		err = cmdStop(args)
 	case "list", "ls":
 		err = cmdList()
 	case "freeze":
 		err = cmdFreeze(args)
-	case "init":
-		err = cmdInit(args)
 	case "new", "n":
 		err = cmdNew(args)
 	case "edit", "e":
@@ -54,7 +49,7 @@ func main() {
 		fmt.Printf("frostmux %s\n", version)
 		return
 	default:
-		err = cmdStart([]string{cmd})
+		err = cmdStart(cmd)
 	}
 
 	if err != nil {
@@ -63,21 +58,8 @@ func main() {
 	}
 }
 
-func cmdStart(args []string) error {
-	fs := flag.NewFlagSet("start", flag.ExitOnError)
-	file := fs.String("f", "", "path to config file")
-	fs.Parse(args)
-
-	var cfgPath string
-	var err error
-
-	if *file != "" {
-		cfgPath = *file
-	} else if fs.NArg() > 0 {
-		cfgPath, err = config.FindConfig(fs.Arg(0))
-	} else {
-		cfgPath, err = config.FindConfig("")
-	}
+func cmdStart(name string) error {
+	cfgPath, err := config.FindConfig(name)
 	if err != nil {
 		return err
 	}
@@ -101,7 +83,7 @@ func cmdStop(args []string) error {
 }
 
 func cmdList() error {
-	configs, err := session.ListConfigs()
+	configs, err := config.ListConfigs()
 	if err != nil {
 		return err
 	}
@@ -117,16 +99,9 @@ func cmdList() error {
 	return nil
 }
 
-// cmdFreeze snapshots a live tmux session into YAML.
-// With a name it saves to disk, without it dumps to stdout so you can pipe it.
 func cmdFreeze(args []string) error {
-	var name string
-	if len(args) > 0 {
-		name = args[0]
-	}
-
 	mgr := session.NewManager(tmux.NewClient())
-	cfg, err := mgr.Freeze(name)
+	cfg, err := mgr.Freeze()
 	if err != nil {
 		return err
 	}
@@ -136,64 +111,18 @@ func cmdFreeze(args []string) error {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	if name != "" {
-		dir := config.Dir()
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("creating config dir: %w", err)
-		}
-
-		path := filepath.Join(dir, name+".yml")
-		_, exists := os.Stat(path)
-		if err := os.WriteFile(path, data, 0o644); err != nil {
-			return fmt.Errorf("writing config: %w", err)
-		}
-		if exists == nil {
-			fmt.Printf("updated %s\n", path)
-		} else {
-			fmt.Printf("created %s\n", path)
-		}
-	} else {
-		fmt.Print(string(data))
-	}
-	return nil
-}
-
-// cmdInit looks at the project dir (go.mod, package.json, etc.) and
-// generates a reasonable starting config. Opens $EDITOR so you can tweak it.
-func cmdInit(args []string) error {
-	dir := "."
-	if len(args) > 0 {
-		dir = args[0]
-	}
-
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		return err
-	}
-
-	cfg := config.Detect(absDir)
-
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
-	}
-
-	cfgDir := config.Dir()
-	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+	dir := config.Dir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
 
-	path := filepath.Join(cfgDir, cfg.Session+".yml")
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("config %q already exists, use 'frostmux edit %s' to modify", path, cfg.Session)
-	}
-
+	path := filepath.Join(dir, cfg.Session+".yml")
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
 
-	fmt.Printf("created %s\n", path)
-	return openEditor(path)
+	fmt.Printf("frozen %s\n", path)
+	return nil
 }
 
 func cmdNew(args []string) error {
@@ -202,36 +131,23 @@ func cmdNew(args []string) error {
 	}
 
 	name := args[0]
-	dir := config.Dir()
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("creating config dir: %w", err)
+	client := tmux.NewClient()
+	mgr := session.NewManager(client)
+
+	if client.HasSession(name) {
+		return mgr.Attach(name)
 	}
 
-	path := filepath.Join(dir, name+".yml")
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("config %q already exists", name)
-	}
-
-	scaffold := config.Config{
-		Session: name,
-
-		Windows: []config.Window{
-			{Name: "editor", Panes: []config.Pane{{Command: "$EDITOR ."}}},
-			{Name: "shell", Panes: []config.Pane{{}}},
-		},
-	}
-
-	data, err := yaml.Marshal(&scaffold)
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return fmt.Errorf("getting home directory: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return err
+	if err := client.NewSession(name, home); err != nil {
+		return fmt.Errorf("creating session %q: %w", name, err)
 	}
 
-	fmt.Printf("created %s\n", path)
-	return openEditor(path)
+	return mgr.Attach(name)
 }
 
 func cmdEdit(args []string) error {
@@ -287,10 +203,10 @@ const bashCompletion = `_frostmux() {
     local cur prev commands
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="start stop list freeze init new edit delete completion help version"
+    commands="stop list freeze new edit delete completion help version"
 
     case "$prev" in
-        start|s|stop|st|edit|e|delete|rm)
+        stop|st|edit|e|delete|rm)
             COMPREPLY=($(compgen -W "$(frostmux list 2>/dev/null)" -- "$cur"))
             return
             ;;
@@ -310,16 +226,13 @@ complete -F _frostmux frostmux
 const zshCompletion = `_frostmux() {
     local -a commands projects
     commands=(
-        'start:Start a session from config'
-        's:Start a session from config'
         'stop:Kill a tmux session'
         'st:Kill a tmux session'
         'list:List available configs'
         'ls:List available configs'
         'freeze:Capture current session to YAML'
-        'init:Detect project type and scaffold config'
-        'new:Create a new config'
-        'n:Create a new config'
+        'new:Create a new tmux session'
+        'n:Create a new tmux session'
         'edit:Edit an existing config'
         'e:Edit an existing config'
         'delete:Delete a config'
@@ -339,7 +252,7 @@ const zshCompletion = `_frostmux() {
             ;;
         args)
             case "$words[2]" in
-                start|s|stop|st|edit|e|delete|rm)
+                stop|st|edit|e|delete|rm)
                     projects=(${(f)"$(frostmux list 2>/dev/null)"})
                     [[ ${#projects} -gt 0 ]] && _describe 'project' projects
                     ;;
@@ -355,9 +268,9 @@ compdef _frostmux frostmux
 `
 
 const fishCompletion = `complete -c frostmux -f
-complete -c frostmux -n '__fish_use_subcommand' -a 'start stop list freeze init new edit delete completion help version'
+complete -c frostmux -n '__fish_use_subcommand' -a 'stop list freeze new edit delete completion help version'
 complete -c frostmux -n '__fish_use_subcommand' -a '(frostmux list 2>/dev/null)'
-complete -c frostmux -n '__fish_seen_subcommand_from start s stop st edit e delete rm' -a '(frostmux list 2>/dev/null)'
+complete -c frostmux -n '__fish_seen_subcommand_from stop st edit e delete rm' -a '(frostmux list 2>/dev/null)'
 complete -c frostmux -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
 `
 
@@ -381,23 +294,19 @@ Capture first, config second.
 
 Usage:
   frostmux <command> [arguments]
+  frostmux <project>              Start or attach to a session
 
 Commands:
-  start, s   <project> [-f file]  Start a session from config
   stop, st   <project>            Kill a tmux session
   list, ls                        List available configs
-  freeze     [name]               Capture current session to YAML
-  init       [dir]                Detect project type, scaffold config
-  new, n     <project>            Create a new config in $EDITOR
+  freeze                          Capture current session to YAML
+  new, n     <project>            Create a new tmux session
   edit, e    <project>            Edit an existing config
   delete, rm <project>            Delete a config
   completion <shell>              Generate shell completion (bash|zsh|fish)
   version                         Print version
   help                            Show this help
 
-Shortcut:
-  frostmux <project>                Same as 'frostmux start <project>'
-
-Config files: ~/.config/frostmux/ (override with $frostmux_CONFIG)
+Config files: ~/.config/frostmux/ (override with $FROSTMUX_CONFIG)
 `)
 }

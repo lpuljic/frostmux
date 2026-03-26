@@ -3,7 +3,7 @@ package session
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/lpuljic/frostmux/internal/config"
@@ -25,7 +25,7 @@ func (m *Manager) Start(cfg *config.Config) error {
 
 	// already running? just jump to it
 	if m.tmux.HasSession(cfg.Session) {
-		return m.attach(cfg.Session)
+		return m.Attach(cfg.Session)
 	}
 
 	for i, win := range cfg.Windows {
@@ -71,17 +71,17 @@ func (m *Manager) Start(cfg *config.Config) error {
 		for j, pane := range win.Panes {
 			if pane.Command != "" {
 				paneTarget := fmt.Sprintf("%s.%d", winTarget, j)
-				m.tmux.SendKeys(paneTarget, pane.Command)
+				m.tmux.SendKeys(paneTarget, expandEditor(pane.Command))
 			}
 		}
 	}
 
-	// land the user on the first window, first pane
-	firstWin := cfg.Session + ":" + cfg.Windows[0].Name
-	m.tmux.SelectWindow(firstWin)
-	m.tmux.SelectPane(firstWin + ".0")
+	focusWin, focusPane := parseFocus(cfg.Focus, cfg.Windows[0].Name)
+	target := cfg.Session + ":" + focusWin
+	m.tmux.SelectWindow(target)
+	m.tmux.SelectPane(fmt.Sprintf("%s.%d", target, focusPane))
 
-	return m.attach(cfg.Session)
+	return m.Attach(cfg.Session)
 }
 
 func (m *Manager) Stop(name string) error {
@@ -91,10 +91,10 @@ func (m *Manager) Stop(name string) error {
 	return m.tmux.KillSession(name)
 }
 
-func (m *Manager) Freeze(saveName string) (*config.Config, error) {
+func (m *Manager) Freeze() (*config.Config, error) {
 	session, err := m.tmux.CurrentSession()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("not inside a tmux session, nothing to freeze")
 	}
 
 	windows, err := m.tmux.ListWindows(session)
@@ -102,13 +102,18 @@ func (m *Manager) Freeze(saveName string) (*config.Config, error) {
 		return nil, fmt.Errorf("listing windows: %w", err)
 	}
 
-	name := saveName
-	if name == "" {
-		name = session
+	cfg := &config.Config{
+		Session: session,
 	}
 
-	cfg := &config.Config{
-		Session: name,
+	// capture which window/pane the user is currently looking at
+	if activeWin, err := m.tmux.ActiveWindow(session); err == nil {
+		activePaneIdx, _ := m.tmux.ActivePane(session)
+		if activePaneIdx != "" && activePaneIdx != "0" {
+			cfg.Focus = activeWin + "." + activePaneIdx
+		} else if len(windows) > 0 && activeWin != windows[0].Name {
+			cfg.Focus = activeWin
+		}
 	}
 
 	for _, win := range windows {
@@ -147,45 +152,50 @@ func (m *Manager) Freeze(saveName string) (*config.Config, error) {
 	return cfg, nil
 }
 
-// attach or switch depending on whether we're already inside tmux.
+// Attach or switch depending on whether we're already inside tmux.
 // switch-client works from within tmux, attach-session from outside.
-func (m *Manager) attach(name string) error {
+func (m *Manager) Attach(name string) error {
 	if tmux.InsideTmux() {
 		return m.tmux.SwitchClient(name)
 	}
 	return m.tmux.Attach(name)
 }
 
-func isShell(cmd string) bool {
-	shells := map[string]bool{
-		"bash": true, "zsh": true, "fish": true,
-		"sh": true, "dash": true, "ksh": true,
-		"tcsh": true, "csh": true,
+// parseFocus splits a focus string like "code" or "code.1" into a
+// window name and pane index. Falls back to defaultWin and pane 0.
+func parseFocus(focus, defaultWin string) (string, int) {
+	if focus == "" {
+		return defaultWin, 0
 	}
-	return shells[filepath.Base(cmd)]
+
+	win, paneStr, ok := strings.Cut(focus, ".")
+	if !ok {
+		return win, 0
+	}
+
+	pane, err := strconv.Atoi(paneStr)
+	if err != nil {
+		return win, 0
+	}
+	return win, pane
 }
 
-func ListConfigs() ([]string, error) {
-	dir := config.Dir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
+// expandEditor resolves $EDITOR/$VISUAL before sending commands to tmux
+// panes, since the shell inside tmux might not have them set. Falls back to vi.
+func expandEditor(cmd string) string {
+	if !strings.Contains(cmd, "$EDITOR") && !strings.Contains(cmd, "$VISUAL") {
+		return cmd
 	}
 
-	var configs []string
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if before, ok := strings.CutSuffix(name, ".yml"); ok {
-			configs = append(configs, before)
-		} else if before, ok := strings.CutSuffix(name, ".yaml"); ok {
-			configs = append(configs, before)
-		}
+	editor := os.Getenv("VISUAL")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
 	}
-	return configs, nil
+	if editor == "" {
+		editor = "vi"
+	}
+
+	cmd = strings.ReplaceAll(cmd, "$VISUAL", editor)
+	cmd = strings.ReplaceAll(cmd, "$EDITOR", editor)
+	return cmd
 }

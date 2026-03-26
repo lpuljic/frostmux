@@ -11,6 +11,7 @@ import (
 
 type Config struct {
 	Session string   `yaml:"session"`
+	Focus   string   `yaml:"focus,omitempty"`
 	Windows []Window `yaml:"windows"`
 }
 
@@ -189,6 +190,32 @@ func FindConfig(name string) (string, error) {
 	}
 
 	return "", fmt.Errorf("config %q not found in %s", name, Dir())
+}
+
+// ListConfigs returns the names of all config files in the config directory.
+func ListConfigs() ([]string, error) {
+	dir := Dir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if before, ok := strings.CutSuffix(name, ".yml"); ok {
+			names = append(names, before)
+		} else if before, ok := strings.CutSuffix(name, ".yaml"); ok {
+			names = append(names, before)
+		}
+	}
+	return names, nil
 }
 
 func ExpandPath(path string) string {

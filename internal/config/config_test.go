@@ -295,65 +295,6 @@ windows:
 	}
 }
 
-func TestDetectGoProject(t *testing.T) {
-	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test"), 0o644)
-
-	cfg := Detect(dir)
-	if cfg.Session != filepath.Base(dir) {
-		t.Errorf("session = %q, want %q", cfg.Session, filepath.Base(dir))
-	}
-
-	names := make([]string, len(cfg.Windows))
-	for i, w := range cfg.Windows {
-		names[i] = w.Name
-	}
-
-	want := []string{"editor", "build", "test"}
-	if len(names) != len(want) {
-		t.Fatalf("windows = %v, want %v", names, want)
-	}
-	for i, n := range want {
-		if names[i] != n {
-			t.Errorf("window[%d] = %q, want %q", i, names[i], n)
-		}
-	}
-
-	for _, w := range cfg.Windows {
-		if w.Root == "" {
-			t.Errorf("window %q has empty root", w.Name)
-		}
-	}
-}
-
-func TestDetectNodeProject(t *testing.T) {
-	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}"), 0o644)
-
-	cfg := Detect(dir)
-	if len(cfg.Windows) != 3 {
-		t.Fatalf("expected 3 windows, got %d", len(cfg.Windows))
-	}
-	if cfg.Windows[1].Name != "dev" {
-		t.Errorf("window[1] = %q, want %q", cfg.Windows[1].Name, "dev")
-	}
-}
-
-func TestDetectDefaultProject(t *testing.T) {
-	dir := t.TempDir()
-
-	cfg := Detect(dir)
-	if len(cfg.Windows) != 2 {
-		t.Fatalf("expected 2 windows, got %d", len(cfg.Windows))
-	}
-	if cfg.Windows[0].Name != "editor" {
-		t.Errorf("window[0] = %q, want %q", cfg.Windows[0].Name, "editor")
-	}
-	if cfg.Windows[1].Name != "shell" {
-		t.Errorf("window[1] = %q, want %q", cfg.Windows[1].Name, "shell")
-	}
-}
-
 func parseFromYAML(t *testing.T, data string) *Config {
 	t.Helper()
 	dir := t.TempDir()

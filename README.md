@@ -117,6 +117,30 @@ windows:
           root: ~/code/api/tests
 ```
 
+### Focus: choose where you land
+
+By default frostmux selects the first window, first pane. Use `focus` to land somewhere else:
+
+```yaml
+session: my-project
+focus: dev       # land on the "dev" window, pane 0
+windows:
+  - editor: nvim
+  - dev:
+      root: ~/code/my-project
+      panes:
+        - command: go run .
+        - command: go test ./...
+```
+
+You can target a specific pane with `window.pane`:
+
+```yaml
+focus: dev.1     # land on the "dev" window, second pane
+```
+
+When you `freeze` a session, frostmux captures whichever window and pane you're currently looking at.
+
 ### Mixed: all three in one config
 
 ```yaml

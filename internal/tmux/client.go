@@ -92,17 +92,6 @@ func (c *Client) KillSession(name string) error {
 	return err
 }
 
-func (c *Client) ListSessions() ([]string, error) {
-	out, err := c.exec("list-sessions", "-F", "#{session_name}")
-	if err != nil {
-		return nil, err
-	}
-	if out == "" {
-		return nil, nil
-	}
-	return strings.Split(out, "\n"), nil
-}
-
 func (c *Client) CurrentSession() (string, error) {
 	out, err := c.exec("display-message", "-p", "#{session_name}")
 	if err != nil {
@@ -118,9 +107,8 @@ type WindowInfo struct {
 }
 
 type PaneInfo struct {
-	Index          string
-	CurrentPath    string
-	CurrentCommand string
+	Index       string
+	CurrentPath string
 }
 
 // ListWindows parses the tab-delimited output from tmux list-windows.
@@ -147,24 +135,39 @@ func (c *Client) ListWindows(session string) ([]WindowInfo, error) {
 }
 
 func (c *Client) ListPanes(target string) ([]PaneInfo, error) {
-	out, err := c.exec("list-panes", "-t", target, "-F", "#{pane_index}\t#{pane_current_path}\t#{pane_current_command}")
+	out, err := c.exec("list-panes", "-t", target, "-F", "#{pane_index}\t#{pane_current_path}")
 	if err != nil {
 		return nil, err
 	}
 
 	var panes []PaneInfo
 	for line := range strings.SplitSeq(out, "\n") {
-		parts := strings.SplitN(line, "\t", 3)
-		if len(parts) != 3 {
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) != 2 {
 			continue
 		}
 		panes = append(panes, PaneInfo{
-			Index:          parts[0],
-			CurrentPath:    parts[1],
-			CurrentCommand: parts[2],
+			Index:       parts[0],
+			CurrentPath: parts[1],
 		})
 	}
 	return panes, nil
+}
+
+func (c *Client) ActiveWindow(session string) (string, error) {
+	out, err := c.exec("display-message", "-t", session, "-p", "#{window_name}")
+	if err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+func (c *Client) ActivePane(session string) (string, error) {
+	out, err := c.exec("display-message", "-t", session, "-p", "#{pane_index}")
+	if err != nil {
+		return "", err
+	}
+	return out, nil
 }
 
 func InsideTmux() bool {
